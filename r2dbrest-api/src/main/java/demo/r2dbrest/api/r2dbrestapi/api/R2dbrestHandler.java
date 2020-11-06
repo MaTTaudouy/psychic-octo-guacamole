@@ -34,7 +34,7 @@ public class R2dbrestHandler {
 		final String tablename = extractTablename(request);
 		final Mono<Map<String, Object>> resource = request.bodyToMono(Map.class);
 		return ServerResponse.ok().contentType(MediaType.APPLICATION_JSON).body(this.r2dbcQueryExecutor
-				.createTableIfNecessary(tablename).then(this.r2dbcQueryExecutor.save(tablename, resource)).log(),
+				.createTableIfNecessary(tablename).then(this.r2dbcQueryExecutor.save(tablename, resource)),
 				String.class);
 	}
 
@@ -43,7 +43,6 @@ public class R2dbrestHandler {
 		if (Strings.isBlank(tablename)) {
 			throw new IllegalArgumentException();
 		}
-		// FIXME add check table exist
 		return tablename;
 	}
 
