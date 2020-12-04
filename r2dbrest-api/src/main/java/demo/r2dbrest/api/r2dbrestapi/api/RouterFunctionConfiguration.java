@@ -27,11 +27,19 @@ public class RouterFunctionConfiguration implements WebFluxConfigurer {
 	private DatabaseClient databaseClient;
 
 	@Autowired
-	private R2dbrestHandler r2dbrestHandler;
+	private R2dbrestCrudHandler r2dbrestCrudHandler;
+
+	@Autowired
+	private R2dbrestEventHandler r2dbrestEventHandler;
 
 	@Bean
-	public R2dbrestHandler r2dbrestHandler(R2dbcQueryExecutor r2dbcQueryExecutor) {
-		return new R2dbrestHandler(r2dbcQueryExecutor);
+	public R2dbrestCrudHandler r2dbrestCrudHandler(R2dbcQueryExecutor r2dbcQueryExecutor) {
+		return new R2dbrestCrudHandler(r2dbcQueryExecutor);
+	}
+
+	@Bean
+	public R2dbrestEventHandler r2dbrestEventHandler(R2dbcQueryExecutor r2dbcQueryExecutor) {
+		return new R2dbrestEventHandler(r2dbcQueryExecutor);
 	}
 
 	@Bean
@@ -50,11 +58,17 @@ public class RouterFunctionConfiguration implements WebFluxConfigurer {
 	}
 
 	@Bean
-	public RouterFunction<?> requestMapping() {
+	public RouterFunction<?> crudRequestMapping() {
 		return RouterFunctions.route()
-				.GET("/*/{id}", RequestPredicates.accept(MediaType.TEXT_PLAIN), r2dbrestHandler::getById)
-				.GET("/*", RequestPredicates.accept(MediaType.TEXT_PLAIN), r2dbrestHandler::getAll)
-				.POST("/*", RequestPredicates.accept(MediaType.APPLICATION_JSON), r2dbrestHandler::post).build();
+				.GET("/*/{id}", RequestPredicates.accept(MediaType.TEXT_PLAIN), r2dbrestCrudHandler::getById)
+				.GET("/*", RequestPredicates.accept(MediaType.TEXT_PLAIN), r2dbrestCrudHandler::getAll)
+				.POST("/*", RequestPredicates.accept(MediaType.APPLICATION_JSON), r2dbrestCrudHandler::post)
+				.PUT("/*/{id}", RequestPredicates.accept(MediaType.APPLICATION_JSON), r2dbrestCrudHandler::put).build();
+	}
+
+	@Bean
+	public RouterFunction<?> eventRequestMapping() {
+		return RouterFunctions.route().GET("/stream/*/{id}", r2dbrestEventHandler::eventById).build();
 	}
 
 //	@Bean

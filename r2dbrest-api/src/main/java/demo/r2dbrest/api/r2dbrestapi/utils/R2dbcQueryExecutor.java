@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.data.relational.core.query.Criteria;
+import org.springframework.data.relational.core.query.Update;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -20,6 +21,8 @@ public class R2dbcQueryExecutor {
 
 	private R2dbcJsonConverter r2dbcJsonConverter;
 
+	private boolean forceIdInUpdate = false;
+
 	public R2dbcQueryExecutor(R2dbcEntityTemplate r2dbcTemplate, R2dbcJsonConverter r2dbcJsonConverter) {
 		this.r2dbcTemplate = r2dbcTemplate;
 		this.r2dbcJsonConverter = r2dbcJsonConverter;
@@ -32,16 +35,16 @@ public class R2dbcQueryExecutor {
 				});
 	}
 
-	public Mono<String> save(String tableName, Mono<Map<String, Object>> jsonData) {
+	public Mono<Map<String, Object>> save(String tableName, Mono<Map<String, Object>> jsonData) {
 		return jsonData.flatMap((data) -> this.insertData(UUID.randomUUID(), tableName, data));
 	}
 
-	private Mono<String> insertData(UUID id, String tableName, Map<String, Object> data) {
+	private Mono<Map<String, Object>> insertData(UUID id, String tableName, Map<String, Object> jsonData) {
 		// Add id into Json column or replace it with the generate value
-		data.put("id", id);
+		jsonData.put("id", id);
 		return r2dbcTemplate.getDatabaseClient().insert().into(tableName)
-				.value(r2dbcJsonConverter.getJsonColumnname(), data).value("id", id).fetch().one()
-				.map(r2dbcJsonConverter::jsonToString);
+				.value(r2dbcJsonConverter.getJsonColumnname(), jsonData).value("id", id).fetch().one()
+				.map(r2dbcJsonConverter::convertColumn);
 	}
 
 	public Mono<Map<String, Object>> createTableIfNecessary(String tablename) {
@@ -53,12 +56,27 @@ public class R2dbcQueryExecutor {
 		return r2dbcTemplate.getDatabaseClient().execute(String.format(CREATE_TABLE_FOR_NAME, tablename)).fetch().one();
 	}
 
-	public Object findById(String tablename, String id) {
-		return r2dbcTemplate.getDatabaseClient().select().from(tablename)
-				.matching(Criteria.where("id").is(UUID.fromString(id))).project(r2dbcJsonConverter.getJsonColumnname())
-				.fetch().one().map((v) -> {
-					return r2dbcJsonConverter.convertColumn(v);
-				});
+	public Mono<Map<String, Object>> findById(String tablename, String id) {
+		return r2dbcTemplate.getDatabaseClient().select().from(tablename).matching(whereUUIDCriteria(id))
+				.project(r2dbcJsonConverter.getJsonColumnname()).fetch().one().map(r2dbcJsonConverter::convertColumn);
+	}
+
+	private Criteria whereUUIDCriteria(String id) {
+		return Criteria.where("id").is(UUID.fromString(id));
+	}
+
+	public Mono<Integer> update(String tablename, String id, Mono<Map<String, Object>> jsonData) {
+		return jsonData.flatMap((data) -> this.updateData(id, tablename, data));
+	}
+
+	private Mono<Integer> updateData(String id, String tablename, Map<String, Object> jsonData) {
+		if (forceIdInUpdate) {
+			// Update id into Json column with the good value to prevent integrity issues
+			jsonData.put("id", id);
+		}
+		return r2dbcTemplate.getDatabaseClient().update().table(tablename)
+				.using(Update.update(r2dbcJsonConverter.getJsonColumnname(), jsonData)).matching(whereUUIDCriteria(id))
+				.fetch().rowsUpdated();
 	}
 
 }
