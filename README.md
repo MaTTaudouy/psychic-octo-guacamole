@@ -1,4 +1,4 @@
-# r2dbrest-api
+# r2dbrest-json-server
 R2DBC Postrgres Rest API for mock a CRUD JSON Server with a real reactive database
 
 #TODO tech
